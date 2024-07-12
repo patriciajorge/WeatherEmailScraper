@@ -12,11 +12,11 @@ Bibliotecas Python necessárias: selenium, webdriver_manager, schedule, smtplib,
 Conta de e-mail Gmail para envio 
 
 # Configuração
-Instale as dependências necessárias:
+- Instale as dependências necessárias:
 pip install selenium webdriver_manager schedule 
 
-Execute o script para testar o envio de e-mails:
-python seu_script.py
+- Execute o script para testar o envio de e-mails:
+python app.py
 
 # Notas:
 Certifique-se de que o Chrome WebDriver está instalado e configurado corretamente.
