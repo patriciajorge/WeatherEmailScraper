@@ -2,8 +2,6 @@ from selenium.common.exceptions import NoSuchElementException, ElementNotVisible
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
@@ -28,7 +26,7 @@ def iniciar_driver():
         'profile.default_content_setting_values.notifications': 2,
         'profile.default_content_setting_values.automatic_downloads': 1,
     })
-    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
+    driver = webdriver.Chrome(options=chrome_options)
 
     wait = WebDriverWait(
         driver,
@@ -40,39 +38,55 @@ def iniciar_driver():
 
 def obter_previsao(driver, wait, cidade):
     # Entrar no site do AccuWeather
+    print('Entrando no site AccuWeather')
     driver.get('https://www.accuweather.com/')
-    sleep(4)
+    sleep(3)
 
     # Procurar pelo campo de cidade
+    print('Digitando a cidade de preferência')
     campo_cidade = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@class='search-input']")))
     campo_cidade.send_keys(cidade)
-    sleep(4)
+    sleep(3)
     campo_cidade.send_keys(Keys.ENTER)
-    sleep(5)
+    sleep(3)
 
     # Rolar a página para baixo
     driver.execute_script("window.scrollTo(0, 300);")
-    sleep(5)
+    sleep(3)
 
     # Extrair a temperatura e condição do tempo
     try:
+        print('Pegando as informações sobre a previsão do tempo')
         temperatura_element = wait.until(EC.presence_of_element_located((By.XPATH, "//div[@class='temp-container']//div[@class='temp']")))
         condicaotempo_element = wait.until(EC.presence_of_element_located((By.XPATH, "//span[@class='phrase']")))
-        temperatura = temperatura_element.text
+        temperatura_atual = temperatura_element.text
         condicaotempo = condicaotempo_element.text
-        
+
         driver.execute_script("window.scrollTo(0, 1600);")
-        sleep(5)
+        sleep(3)
 
         # Extrair a previsão do tempo dos próximos 3 dias
-        previsoes = []
+        previsoes_proximo_3_dias = []
         for i in range(2, 5):
             dia_xpath = f"//a[@class='daily-list-item '][{i}]/div/p"
+            temp_max_xpath = f"//a[@class='daily-list-item '][{i}]//span[@class='temp-hi']"
+            temp_min_xpath = f"//a[@class='daily-list-item '][{i}]//span[@class='temp-lo']"
+
             dia_elements = wait.until(EC.presence_of_all_elements_located((By.XPATH, dia_xpath)))
             dia_texts = [dia.text for dia in dia_elements]
-            previsoes.append(dia_texts)
+            
+            temp_max_element = wait.until(EC.presence_of_element_located((By.XPATH, temp_max_xpath)))
+            temp_min_element = wait.until(EC.presence_of_element_located((By.XPATH, temp_min_xpath)))
+            
+            temp_max = temp_max_element.text
+            temp_lo = temp_min_element.text
+            
+            temperatura_proximos_dias = f"Temperatura Máxima: {temp_max}, Temperatura Mínima: {temp_lo}"
+            dia_texts.append(temperatura_proximos_dias)
+            previsoes_proximo_3_dias.append(dia_texts)
 
-        return temperatura, condicaotempo, previsoes
+        return temperatura_atual, condicaotempo, previsoes_proximo_3_dias
+
     except NoSuchElementException:
         print("Elemento não encontrado")
         return None
@@ -93,6 +107,7 @@ def format_previsoes(previsoes):
     return formatted_previsoes
 
 def enviar_email(destinatario, cidade, temperatura, condicaotempo, previsoes):
+    print('Criando o email com essas informações')
     EMAIL_ADDRESS = os.getenv('EMAIL_ADDRESS')
     EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
 
@@ -103,7 +118,7 @@ def enviar_email(destinatario, cidade, temperatura, condicaotempo, previsoes):
     mail['Subject'] = 'Previsão do tempo'
 
     # Montando a mensagem HTML com formatação
-    mensagem = '''
+    mensagem = f'''
     <!DOCTYPE html>
     <html lang="pt-BR">
     <head>
@@ -164,7 +179,7 @@ def enviar_email(destinatario, cidade, temperatura, condicaotempo, previsoes):
             <p>Condição: {condicaotempo}</p>
             <div class="forecast">
                 <h2>Previsão para os próximos 3 dias:</h2>
-                {previsoes}
+                {format_previsoes(previsoes)}
             </div>
         </div>
         <!-- START FOOTER -->
@@ -185,7 +200,7 @@ def enviar_email(destinatario, cidade, temperatura, condicaotempo, previsoes):
         <!-- END FOOTER -->
     </body>
     </html>
-    '''.format(cidade=cidade, temperatura=temperatura, condicaotempo=condicaotempo, previsoes=format_previsoes(previsoes))
+    '''
 
     mail['From'] = EMAIL_ADDRESS
     mail['To'] = destinatario
@@ -197,7 +212,7 @@ def enviar_email(destinatario, cidade, temperatura, condicaotempo, previsoes):
         smtp.send_message(mail)
         print('Email enviado com sucesso!')
 
-def executar_script():
+def iniciar_automacao():
     driver, wait = iniciar_driver()
     cidade = 'Campinas, São Paulo'
     temperatura, condicaotempo, previsoes = obter_previsao(driver, wait, cidade)
@@ -210,14 +225,16 @@ def executar_script():
 
 def agendar_email():
     # Schedule para executar todos os dias às 08:00
-    schedule.every().day.at('08:00').do(lambda: executar_script())
+    schedule.every().day.at('12:54').do(iniciar_automacao)
+    
 
 if __name__ == "__main__":
-    load_dotenv()
+    print('Iniciando automação...')
+    load_dotenv()    
 
     # Agendar o envio diário
     agendar_email()
 
     while True:
         schedule.run_pending()
-        sleep(60)
+        sleep(1)
