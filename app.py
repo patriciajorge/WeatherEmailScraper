@@ -225,7 +225,7 @@ def iniciar_automacao():
 
 def agendar_email():
     # Schedule para executar todos os dias às 08:00
-    schedule.every().day.at('12:54').do(iniciar_automacao)
+    schedule.every().day.at('08:00').do(iniciar_automacao)
     
 
 if __name__ == "__main__":
